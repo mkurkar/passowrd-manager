@@ -102,6 +102,112 @@ export function useEnvVars() {
     return filtered.map(v => `${v.name}=${v.value}`).join('\n');
   };
 
+  // Parse .env file content into array of {name, value} pairs
+  const parseEnvFile = (content: string): { name: string; value: string }[] => {
+    const lines = content.split('\n');
+    const result: { name: string; value: string }[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Find first = sign (value can contain = signs)
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) continue;
+      
+      const name = trimmed.substring(0, eqIndex).trim();
+      let value = trimmed.substring(eqIndex + 1).trim();
+      
+      // Remove surrounding quotes if present
+      if ((value.startsWith('"') && value.endsWith('"')) || 
+          (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      
+      // Validate name format
+      if (/^[A-Z_][A-Z0-9_]*$/i.test(name)) {
+        result.push({ name: name.toUpperCase(), value });
+      }
+    }
+    
+    return result;
+  };
+
+  // Import multiple env vars from parsed content
+  const importEnvVars = async (
+    parsedVars: { name: string; value: string }[],
+    environment: EnvVarForm['environment'],
+    project?: string,
+    skipExisting?: boolean
+  ): Promise<{ imported: number; skipped: number; errors: string[] }> => {
+    if (!user || !encryptionKey) throw new Error('Not authenticated');
+
+    const existingNames = new Set(envVars.map(v => v.name));
+    let imported = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const { name, value } of parsedVars) {
+      try {
+        if (skipExisting && existingNames.has(name)) {
+          skipped++;
+          continue;
+        }
+
+        const encryptedData = {
+          user: user.id,
+          name,
+          value: encrypt(value, encryptionKey),
+          environment,
+          project: project || '',
+          description: '',
+        };
+
+        await pb.collection('env_vars').create(encryptedData);
+        imported++;
+      } catch (err) {
+        errors.push(`Failed to import ${name}`);
+        console.error(err);
+      }
+    }
+
+    await fetchEnvVars();
+    return { imported, skipped, errors };
+  };
+
+  // Get unique projects from env vars
+  const getProjects = (): string[] => {
+    const projects = new Set<string>();
+    envVars.forEach(v => {
+      if (v.project) projects.add(v.project);
+    });
+    return Array.from(projects).sort();
+  };
+
+  // Group env vars by project
+  const getEnvVarsByProject = (): Record<string, EnvironmentVariable[]> => {
+    const grouped: Record<string, EnvironmentVariable[]> = {
+      'Ungrouped': [],
+    };
+
+    envVars.forEach(v => {
+      const projectKey = v.project || 'Ungrouped';
+      if (!grouped[projectKey]) {
+        grouped[projectKey] = [];
+      }
+      grouped[projectKey].push(v);
+    });
+
+    // Remove empty Ungrouped if there are none
+    if (grouped['Ungrouped'].length === 0) {
+      delete grouped['Ungrouped'];
+    }
+
+    return grouped;
+  };
+
   return {
     envVars,
     isLoading,
@@ -110,6 +216,10 @@ export function useEnvVars() {
     updateEnvVar,
     deleteEnvVar,
     exportEnvFile,
+    parseEnvFile,
+    importEnvVars,
+    getProjects,
+    getEnvVarsByProject,
     refetch: fetchEnvVars,
   };
 }
