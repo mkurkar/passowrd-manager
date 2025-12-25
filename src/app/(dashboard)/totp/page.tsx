@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { usePasswords } from '@/hooks/usePasswords';
@@ -26,8 +26,8 @@ export default function TOTPPage() {
   const [totpTime, setTotpTime] = useState(30);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Filter passwords that have TOTP secrets
-  const totpAccounts = passwords.filter((p) => p.totpSecret);
+  // Filter passwords that have TOTP secrets - memoize to prevent infinite loop
+  const totpAccounts = useMemo(() => passwords.filter((p) => p.totpSecret), [passwords]);
 
   // Update TOTP codes every second
   useEffect(() => {

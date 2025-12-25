@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import pb from '@/lib/pocketbase';
 import { deriveKey, generateSalt, hashPassword } from '@/lib/encryption';
 import type { User } from '@/types';
@@ -29,30 +29,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLocked, setIsLocked] = useState(false);
   const [masterPasswordHash, setMasterPasswordHash] = useState<string | null>(null);
   const [masterPasswordSalt, setMasterPasswordSalt] = useState<string | null>(null);
-  const [lastActivity, setLastActivity] = useState(Date.now());
+  
+  // Use ref for last activity to avoid re-renders
+  const lastActivityRef = useRef(Date.now());
+
+  // Define lock first since it's used by the useEffect below
+  const lock = useCallback(() => {
+    setEncryptionKey(null);
+    setIsLocked(true);
+  }, []);
+
+  const logout = useCallback(() => {
+    pb.authStore.clear();
+    setUser(null);
+    setEncryptionKey(null);
+    setMasterPasswordHash(null);
+    setMasterPasswordSalt(null);
+    setIsLocked(false);
+  }, []);
 
   // Auto-lock after inactivity
   useEffect(() => {
     if (!user || !encryptionKey) return;
 
     const checkInactivity = () => {
-      if (Date.now() - lastActivity > LOCK_TIMEOUT) {
+      const now = Date.now();
+      if (now - lastActivityRef.current > LOCK_TIMEOUT) {
         lock();
       }
     };
 
     const interval = setInterval(checkInactivity, 10000);
     
-    const updateActivity = () => setLastActivity(Date.now());
-    window.addEventListener('mousemove', updateActivity);
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+    
+    // Throttle mouse events to avoid too many updates
+    let throttleTimeout: NodeJS.Timeout | null = null;
+    const throttledUpdateActivity = () => {
+      if (throttleTimeout) return;
+      throttleTimeout = setTimeout(() => {
+        updateActivity();
+        throttleTimeout = null;
+      }, 1000);
+    };
+    
+    window.addEventListener('mousemove', throttledUpdateActivity);
     window.addEventListener('keydown', updateActivity);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('mousemove', updateActivity);
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+      window.removeEventListener('mousemove', throttledUpdateActivity);
       window.removeEventListener('keydown', updateActivity);
     };
-  }, [user, encryptionKey, lastActivity]);
+  }, [user, encryptionKey, lock]);
 
   // Check for existing auth on mount
   useEffect(() => {
@@ -98,15 +130,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(email, password);
   };
 
-  const logout = useCallback(() => {
-    pb.authStore.clear();
-    setUser(null);
-    setEncryptionKey(null);
-    setMasterPasswordHash(null);
-    setMasterPasswordSalt(null);
-    setIsLocked(false);
-  }, []);
-
   const setMasterPassword = (password: string) => {
     const salt = generateSalt();
     const hash = hashPassword(password, salt);
@@ -116,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMasterPasswordHash(hash);
     setEncryptionKey(key);
     setIsLocked(false);
-    setLastActivity(Date.now());
+    lastActivityRef.current = Date.now();
     
     // Store salt in localStorage (hash is for verification, salt is needed to derive key)
     localStorage.setItem(`masterSalt_${user?.id}`, salt);
@@ -140,17 +163,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMasterPasswordHash(storedHash);
       setMasterPasswordSalt(storedSalt);
       setIsLocked(false);
-      setLastActivity(Date.now());
+      lastActivityRef.current = Date.now();
       return true;
     }
     
     return false;
   };
-
-  const lock = useCallback(() => {
-    setEncryptionKey(null);
-    setIsLocked(true);
-  }, []);
 
   return (
     <AuthContext.Provider
