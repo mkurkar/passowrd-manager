@@ -6,23 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useEnvVars } from '@/hooks/useEnvVars';
 import { UnlockScreen } from '@/components/UnlockScreen';
 import { Sidebar } from '@/components/Sidebar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Loader2,
   Plus,
   Search,
   Eye,
@@ -34,10 +18,9 @@ import {
   Variable,
   Check,
   FileCode,
+  X,
 } from 'lucide-react';
 import type { EnvironmentVariable, EnvVarForm } from '@/types';
-
-const environments = ['all', 'development', 'staging', 'production'] as const;
 
 export default function EnvVarsPage() {
   const { user, isLoading, isLocked } = useAuth();
@@ -75,8 +58,11 @@ export default function EnvVarsPage() {
 
   if (isLoading || envVarsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <svg className="h-8 w-8 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
       </div>
     );
   }
@@ -136,7 +122,6 @@ export default function EnvVarsPage() {
       return;
     }
 
-    // Validate env var name format
     if (!/^[A-Z_][A-Z0-9_]*$/i.test(formData.name)) {
       setFormError('Name must start with a letter or underscore and contain only letters, numbers, and underscores');
       return;
@@ -181,162 +166,240 @@ export default function EnvVarsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const getEnvBadgeColor = (env: string) => {
+  const getEnvBadgeStyle = (env: string) => {
     switch (env) {
       case 'production':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+        return 'bg-destructive/10 text-destructive border-destructive';
       case 'staging':
-        return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+        return 'bg-amber-50 text-amber-700 border-amber-500';
       case 'development':
-        return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+        return 'bg-primary/10 text-primary border-primary';
       default:
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        return 'bg-blue-50 text-blue-700 border-blue-500';
     }
   };
 
+  const tabs = [
+    { id: 'all', label: 'All' },
+    { id: 'development', label: 'Dev' },
+    { id: 'staging', label: 'Stage' },
+    { id: 'production', label: 'Prod' },
+  ];
+
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
-        <div className="max-w-6xl mx-auto">
+      <main className="flex-1 min-w-0 pt-16 lg:pt-0">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Environment Variables</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Manage your environment variables securely
+              <h1 className="text-2xl font-bold text-foreground uppercase tracking-wide">Environment Variables</h1>
+              <p className="text-sm text-muted-foreground">
+                {filteredEnvVars.length} variable{filteredEnvVars.length !== 1 ? 's' : ''} stored
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExport}>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExport}
+                className="inline-flex items-center justify-center px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+              >
                 <Download className="h-4 w-4 mr-2" />
-                Export .env
-              </Button>
-              <Button onClick={() => openDialog()}>
+                Export
+              </button>
+              <button
+                onClick={() => openDialog()}
+                className="inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Variable
-              </Button>
+              </button>
             </div>
           </div>
 
           {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search variables..."
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="block w-full border border-input bg-background pl-12 pr-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
-            <Tabs value={filterEnv} onValueChange={setFilterEnv}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="development">Dev</TabsTrigger>
-                <TabsTrigger value="staging">Staging</TabsTrigger>
-                <TabsTrigger value="production">Prod</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            
+            {/* Tabs */}
+            <div className="flex border border-border bg-muted/50">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterEnv(tab.id)}
+                  className={`px-4 py-2.5 text-sm font-bold uppercase tracking-wide transition-all ${
+                    filterEnv === tab.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Variable List */}
           {filteredEnvVars.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Variable className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No environment variables yet
+            <div className="bg-card border border-border shadow-sm p-8 sm:p-12 text-center">
+              <div className="inline-flex p-4 bg-muted mb-4">
+                <Variable className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2 uppercase tracking-wide">
+                No Variables Yet
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                Add your first environment variable to get started
+              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                Add your first environment variable to start managing your configuration
               </p>
-              <Button onClick={() => openDialog()}>
+              <button
+                onClick={() => openDialog()}
+                className="inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-200 uppercase tracking-wide"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Variable
-              </Button>
-            </Card>
+              </button>
+            </div>
           ) : (
-            <div className="grid gap-3">
+            <div className="space-y-3">
               {filteredEnvVars.map((envVar) => (
-                <Card key={envVar.id} className="animate-fade-in">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
+                <div key={envVar.id} className="bg-card border border-border shadow-sm hover:border-primary/30 transition-colors animate-fade-in">
+                  <div className="p-4 sm:p-5">
+                    {/* Mobile Layout */}
+                    <div className="lg:hidden space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <code className="font-mono font-bold text-foreground">
+                              {envVar.name}
+                            </code>
+                            <span className={`px-2 py-0.5 text-xs border uppercase tracking-wider ${getEnvBadgeStyle(envVar.environment)}`}>
+                              {envVar.environment}
+                            </span>
+                          </div>
+                          {envVar.project && (
+                            <span className="text-xs text-muted-foreground">
+                              Project: {envVar.project}
+                            </span>
+                          )}
+                          {envVar.description && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {envVar.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openDialog(envVar)}
+                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(envVar.id)}
+                            className="p-2 text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Value Row */}
+                      <div className="flex items-center gap-1 bg-muted border-2 border-border px-3 py-2">
+                        <code className="text-sm font-mono flex-1 truncate text-foreground">
+                          {showValue[envVar.id] ? envVar.value : '••••••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setShowValue((prev) => ({ ...prev, [envVar.id]: !prev[envVar.id] }))}
+                        >
+                          {showValue[envVar.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => handleCopy(envVar.value, envVar.id)}
+                        >
+                          {copiedId === envVar.id ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden lg:flex items-center gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <code className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                        <div className="flex items-center gap-3 mb-1">
+                          <code className="font-mono font-bold text-foreground">
                             {envVar.name}
                           </code>
-                          <span className={`px-2 py-0.5 text-xs rounded ${getEnvBadgeColor(envVar.environment)}`}>
+                          <span className={`px-2 py-0.5 text-xs border uppercase tracking-wider ${getEnvBadgeStyle(envVar.environment)}`}>
                             {envVar.environment}
                           </span>
                           {envVar.project && (
-                            <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                            <span className="px-2 py-0.5 text-xs bg-muted border border-border text-muted-foreground">
                               {envVar.project}
                             </span>
                           )}
                         </div>
                         {envVar.description && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <p className="text-sm text-muted-foreground">
                             {envVar.description}
                           </p>
                         )}
                       </div>
 
                       {/* Value field */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5 max-w-xs">
-                          <code className="text-sm font-mono truncate">
-                            {showValue[envVar.id] ? envVar.value : '••••••••••••'}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            onClick={() =>
-                              setShowValue((prev) => ({
-                                ...prev,
-                                [envVar.id]: !prev[envVar.id],
-                              }))
-                            }
-                          >
-                            {showValue[envVar.id] ? (
-                              <EyeOff className="h-3 w-3" />
-                            ) : (
-                              <Eye className="h-3 w-3" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            onClick={() => handleCopy(envVar.value, envVar.id)}
-                          >
-                            {copiedId === envVar.id ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
+                      <div className="flex items-center gap-1 bg-muted border-2 border-border px-3 py-2 max-w-sm">
+                        <code className="text-sm font-mono truncate min-w-[120px] text-foreground">
+                          {showValue[envVar.id] ? envVar.value : '••••••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setShowValue((prev) => ({ ...prev, [envVar.id]: !prev[envVar.id] }))}
+                        >
+                          {showValue[envVar.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => handleCopy(envVar.value, envVar.id)}
+                        >
+                          {copiedId === envVar.id ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                        </button>
                       </div>
 
                       {/* Actions */}
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openDialog(envVar)}>
+                        <button
+                          type="button"
+                          onClick={() => openDialog(envVar)}
+                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
                           <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDelete(envVar.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                          className="p-2 text-destructive hover:bg-destructive/10 transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -344,145 +407,222 @@ export default function EnvVarsPage() {
       </main>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingEnvVar ? 'Edit Variable' : 'Add Variable'}</DialogTitle>
-            <DialogDescription>
-              {editingEnvVar
-                ? 'Update the environment variable below'
-                : 'Fill in the details to save a new environment variable'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {formError && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
-                {formError}
+      {isDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-card border border-border shadow-elegant animate-fade-in">
+            {/* Dialog Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-lg font-bold text-foreground uppercase tracking-wide">
+                  {editingEnvVar ? 'Edit Variable' : 'Add Variable'}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {editingEnvVar ? 'Update the environment variable below' : 'Fill in the details to save a new environment variable'}
+                </p>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., DATABASE_URL"
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value.toUpperCase() }))}
-                className="font-mono"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="value">Value *</Label>
-              <Textarea
-                id="value"
-                placeholder="Enter the value..."
-                value={formData.value}
-                onChange={(e) => setFormData((prev) => ({ ...prev, value: e.target.value }))}
-                className="font-mono"
-                rows={3}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="environment">Environment *</Label>
-              <Select
-                id="environment"
-                value={formData.environment}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    environment: e.target.value as EnvVarForm['environment'],
-                  }))
-                }
+              <button
+                type="button"
+                onClick={() => setIsDialogOpen(false)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                <option value="development">Development</option>
-                <option value="staging">Staging</option>
-                <option value="production">Production</option>
-                <option value="all">All Environments</option>
-              </Select>
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="project">Project (optional)</Label>
-              <Input
-                id="project"
-                placeholder="e.g., my-app"
-                value={formData.project}
-                onChange={(e) => setFormData((prev) => ({ ...prev, project: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (optional)</Label>
-              <Input
-                id="description"
-                placeholder="What is this variable for?"
-                value={formData.description}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : editingEnvVar ? (
-                  'Update'
-                ) : (
-                  'Save'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
+            {/* Dialog Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {formError && (
+                <div className="p-4 text-sm text-destructive bg-destructive/10 border-2 border-destructive flex items-center gap-2">
+                  <div className="w-2 h-2 bg-destructive flex-shrink-0" />
+                  {formError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="name" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Name *
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  placeholder="e.g., DATABASE_URL"
+                  value={formData.name}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value.toUpperCase() }))}
+                  required
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground font-mono placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="value" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Value *
+                </label>
+                <textarea
+                  id="value"
+                  placeholder="Enter the value..."
+                  value={formData.value}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, value: e.target.value }))}
+                  rows={3}
+                  required
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground font-mono placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="environment" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Environment *
+                </label>
+                <select
+                  id="environment"
+                  value={formData.environment}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, environment: e.target.value as EnvVarForm['environment'] }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                >
+                  <option value="development">Development</option>
+                  <option value="staging">Staging</option>
+                  <option value="production">Production</option>
+                  <option value="all">All Environments</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="project" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Project (optional)
+                </label>
+                <input
+                  id="project"
+                  type="text"
+                  placeholder="e.g., my-app"
+                  value={formData.project}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, project: e.target.value }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="description" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Description (optional)
+                </label>
+                <input
+                  id="description"
+                  type="text"
+                  placeholder="What is this variable for?"
+                  value={formData.description}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              {/* Dialog Footer */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : editingEnvVar ? (
+                    'Update'
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Export Dialog */}
-      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Export Environment File</DialogTitle>
-            <DialogDescription>
-              Select an environment and export as a .env file
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="exportEnv">Environment</Label>
-              <Select
-                id="exportEnv"
-                value={exportEnv}
-                onChange={(e) => {
-                  setExportEnv(e.target.value);
-                  setExportedContent(exportEnvFile(e.target.value));
-                }}
+      {isExportDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg bg-card border border-border shadow-elegant animate-fade-in">
+            {/* Dialog Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-lg font-bold text-foreground uppercase tracking-wide">
+                  Export Environment File
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select an environment and export as a .env file
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportDialogOpen(false)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                <option value="development">Development</option>
-                <option value="staging">Staging</option>
-                <option value="production">Production</option>
-              </Select>
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label>Preview</Label>
-              <pre className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-mono overflow-auto max-h-64">
-                {exportedContent || 'No variables for this environment'}
-              </pre>
+
+            {/* Dialog Body */}
+            <div className="p-6 space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="exportEnv" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Environment
+                </label>
+                <select
+                  id="exportEnv"
+                  value={exportEnv}
+                  onChange={(e) => {
+                    setExportEnv(e.target.value);
+                    setExportedContent(exportEnvFile(e.target.value));
+                  }}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                >
+                  <option value="development">Development</option>
+                  <option value="staging">Staging</option>
+                  <option value="production">Production</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Preview
+                </label>
+                <pre className="p-4 bg-muted border-2 border-border text-sm font-mono overflow-auto max-h-64 text-foreground">
+                  {exportedContent || 'No variables for this environment'}
+                </pre>
+              </div>
+
+              {/* Dialog Footer */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsExportDialogOpen(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadEnvFile}
+                  disabled={!exportedContent}
+                  className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+                >
+                  <FileCode className="h-4 w-4 mr-2" />
+                  Download
+                </button>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleDownloadEnvFile} disabled={!exportedContent}>
-              <FileCode className="h-4 w-4 mr-2" />
-              Download .env.{exportEnv}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,24 +6,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePasswords } from '@/hooks/usePasswords';
 import { UnlockScreen } from '@/components/UnlockScreen';
 import { Sidebar } from '@/components/Sidebar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { generatePassword } from '@/lib/encryption';
 import { generateTOTPCode, getTOTPRemainingTime } from '@/lib/totp';
-import { cn } from '@/lib/utils';
 import {
-  Loader2,
   Plus,
   Search,
   Eye,
@@ -36,6 +21,7 @@ import {
   Key,
   Smartphone,
   Check,
+  X,
 } from 'lucide-react';
 import type { Password, PasswordForm } from '@/types';
 
@@ -95,8 +81,11 @@ export default function PasswordsPage() {
 
   if (isLoading || passwordsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <svg className="h-8 w-8 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
       </div>
     );
   }
@@ -189,177 +178,244 @@ export default function PasswordsPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
-        <div className="max-w-6xl mx-auto">
+      <main className="flex-1 min-w-0 pt-16 lg:pt-0">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Passwords</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Manage your saved passwords and credentials
+              <h1 className="text-2xl font-bold text-foreground uppercase tracking-wide">Passwords</h1>
+              <p className="text-sm text-muted-foreground">
+                {filteredPasswords.length} credential{filteredPasswords.length !== 1 ? 's' : ''} stored
               </p>
             </div>
-            <Button onClick={() => openDialog()}>
+            <button
+              onClick={() => openDialog()}
+              className="inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Password
-            </Button>
+            </button>
           </div>
 
           {/* Search */}
           <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search passwords..."
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by name, username, or URL..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="block w-full border border-input bg-background pl-12 pr-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
             />
           </div>
 
           {/* Password List */}
           {filteredPasswords.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Key className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No passwords yet
+            <div className="bg-card border border-border shadow-sm p-8 sm:p-12 text-center">
+              <div className="inline-flex p-4 bg-muted mb-4">
+                <Key className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2 uppercase tracking-wide">
+                No Passwords Yet
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                Add your first password to get started
+              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                Add your first password to start securely managing your credentials
               </p>
-              <Button onClick={() => openDialog()}>
+              <button
+                onClick={() => openDialog()}
+                className="inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-200 uppercase tracking-wide"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Password
-              </Button>
-            </Card>
+              </button>
+            </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-3">
               {filteredPasswords.map((password) => (
-                <Card key={password.id} className="animate-fade-in">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
+                <div key={password.id} className="bg-card border border-border shadow-sm hover:border-primary/30 transition-colors animate-fade-in">
+                  <div className="p-4 sm:p-5">
+                    {/* Mobile Layout */}
+                    <div className="lg:hidden space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h3 className="font-bold text-foreground uppercase tracking-wide">
+                              {password.name}
+                            </h3>
+                            {password.category && (
+                              <span className="px-2 py-0.5 text-xs bg-muted border border-border text-muted-foreground uppercase tracking-wider">
+                                {password.category}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {password.username}
+                          </p>
+                          {password.url && (
+                            <a
+                              href={password.url.startsWith('http') ? password.url : `https://${password.url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                            >
+                              {password.url}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openDialog(password)}
+                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(password.id)}
+                            className="p-2 text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Password & TOTP Row */}
+                      <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center gap-1 bg-muted border-2 border-border px-3 py-2 flex-1 min-w-[200px]">
+                          <code className="text-sm font-mono flex-1 truncate text-foreground">
+                            {showPassword[password.id] ? password.password : '••••••••••••'}
+                          </code>
+                          <button
+                            type="button"
+                            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => setShowPassword((prev) => ({ ...prev, [password.id]: !prev[password.id] }))}
+                          >
+                            {showPassword[password.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                          <button
+                            type="button"
+                            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => handleCopy(password.password, `pwd-${password.id}`)}
+                          >
+                            {copiedId === `pwd-${password.id}` ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                        </div>
+
+                        {password.totpSecret && totpCodes[password.id] && (
+                          <div className="flex items-center gap-2 bg-primary/5 border-2 border-primary px-3 py-2">
+                            <Smartphone className="h-4 w-4 text-primary" />
+                            <code className="text-lg font-mono font-bold text-primary">
+                              {totpCodes[password.id]}
+                            </code>
+                            <button
+                              type="button"
+                              className="p-1.5 text-primary hover:text-primary/80 transition-colors"
+                              onClick={() => handleCopy(totpCodes[password.id], `totp-${password.id}`)}
+                            >
+                              {copiedId === `totp-${password.id}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </button>
+                            <div className="w-8 h-1 bg-primary/30">
+                              <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${(totpTime / 30) * 100}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden lg:flex items-center gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-bold text-foreground uppercase tracking-wide">
                             {password.name}
                           </h3>
                           {password.category && (
-                            <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                            <span className="px-2 py-0.5 text-xs bg-muted border border-border text-muted-foreground uppercase tracking-wider">
                               {password.category}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                          {password.username}
-                        </p>
-                        {password.url && (
-                          <a
-                            href={password.url.startsWith('http') ? password.url : `https://${password.url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mt-1"
-                          >
-                            {password.url}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">{password.username}</span>
+                          {password.url && (
+                            <a
+                              href={password.url.startsWith('http') ? password.url : `https://${password.url}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
+                              {password.url}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
                       </div>
 
                       {/* Password field */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5">
-                          <code className="text-sm font-mono">
-                            {showPassword[password.id]
-                              ? password.password
-                              : '••••••••••••'}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() =>
-                              setShowPassword((prev) => ({
-                                ...prev,
-                                [password.id]: !prev[password.id],
-                              }))
-                            }
-                          >
-                            {showPassword[password.id] ? (
-                              <EyeOff className="h-3 w-3" />
-                            ) : (
-                              <Eye className="h-3 w-3" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleCopy(password.password, `pwd-${password.id}`)}
-                          >
-                            {copiedId === `pwd-${password.id}` ? (
-                              <Check className="h-3 w-3 text-green-500" />
-                            ) : (
-                              <Copy className="h-3 w-3" />
-                            )}
-                          </Button>
-                        </div>
+                      <div className="flex items-center gap-1 bg-muted border-2 border-border px-3 py-2">
+                        <code className="text-sm font-mono min-w-[120px] text-foreground">
+                          {showPassword[password.id] ? password.password : '••••••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setShowPassword((prev) => ({ ...prev, [password.id]: !prev[password.id] }))}
+                        >
+                          {showPassword[password.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => handleCopy(password.password, `pwd-${password.id}`)}
+                        >
+                          {copiedId === `pwd-${password.id}` ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                        </button>
                       </div>
 
                       {/* TOTP Code */}
                       {password.totpSecret && totpCodes[password.id] && (
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 rounded-lg px-3 py-1.5">
-                              <Smartphone className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                              <code className="text-lg font-mono font-bold text-amber-700 dark:text-amber-300">
-                                {totpCodes[password.id]}
-                              </code>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => handleCopy(totpCodes[password.id], `totp-${password.id}`)}
-                              >
-                                {copiedId === `totp-${password.id}` ? (
-                                  <Check className="h-3 w-3 text-green-500" />
-                                ) : (
-                                  <Copy className="h-3 w-3" />
-                                )}
-                              </Button>
-                            </div>
-                            {/* Timer bar */}
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-200 dark:bg-amber-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-amber-500 transition-all duration-1000 ease-linear"
-                                style={{ width: `${(totpTime / 30) * 100}%` }}
-                              />
-                            </div>
+                        <div className="flex items-center gap-2 bg-primary/5 border-2 border-primary px-3 py-2">
+                          <Smartphone className="h-4 w-4 text-primary" />
+                          <code className="text-lg font-mono font-bold text-primary">
+                            {totpCodes[password.id]}
+                          </code>
+                          <button
+                            type="button"
+                            className="p-1.5 text-primary hover:text-primary/80 transition-colors"
+                            onClick={() => handleCopy(totpCodes[password.id], `totp-${password.id}`)}
+                          >
+                            {copiedId === `totp-${password.id}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                          <div className="w-8 h-1 bg-primary/30">
+                            <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${(totpTime / 30) * 100}%` }} />
                           </div>
                         </div>
                       )}
 
                       {/* Actions */}
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <button
+                          type="button"
                           onClick={() => openDialog(password)}
+                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         >
                           <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDelete(password.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                          className="p-2 text-destructive hover:bg-destructive/10 transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -367,120 +423,184 @@ export default function PasswordsPage() {
       </main>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingPassword ? 'Edit Password' : 'Add Password'}</DialogTitle>
-            <DialogDescription>
-              {editingPassword
-                ? 'Update the password details below'
-                : 'Fill in the details to save a new password'}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {formError && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
-                {formError}
+      {isDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-card border border-border shadow-elegant max-h-[90vh] overflow-y-auto animate-fade-in">
+            {/* Dialog Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-lg font-bold text-foreground uppercase tracking-wide">
+                  {editingPassword ? 'Edit Password' : 'Add Password'}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {editingPassword ? 'Update the password details below' : 'Fill in the details to save a new password'}
+                </p>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., GitHub"
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                required
-              />
+              <button
+                type="button"
+                onClick={() => setIsDialogOpen(false)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="username">Username / Email *</Label>
-              <Input
-                id="username"
-                placeholder="your@email.com"
-                value={formData.username}
-                onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="password"
+
+            {/* Dialog Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {formError && (
+                <div className="p-4 text-sm text-destructive bg-destructive/10 border-2 border-destructive flex items-center gap-2">
+                  <div className="w-2 h-2 bg-destructive flex-shrink-0" />
+                  {formError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="name" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Name *
+                </label>
+                <input
+                  id="name"
                   type="text"
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="e.g., GitHub"
+                  value={formData.name}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                   required
-                  className="font-mono"
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
                 />
-                <Button type="button" variant="outline" onClick={handleGeneratePassword}>
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="url">Website URL</Label>
-              <Input
-                id="url"
-                placeholder="https://example.com"
-                value={formData.url}
-                onChange={(e) => setFormData((prev) => ({ ...prev, url: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                placeholder="e.g., Work, Personal, Finance"
-                value={formData.category}
-                onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="totpSecret">TOTP Secret (for 2FA)</Label>
-              <Input
-                id="totpSecret"
-                placeholder="Enter TOTP secret key"
-                value={formData.totpSecret}
-                onChange={(e) => setFormData((prev) => ({ ...prev, totpSecret: e.target.value }))}
-                className="font-mono"
-              />
-              <p className="text-xs text-gray-500">
-                Add a TOTP secret to generate 2FA codes for this account
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Additional notes..."
-                value={formData.notes}
-                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                rows={3}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : editingPassword ? (
-                  'Update'
-                ) : (
-                  'Save'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
+              <div className="space-y-2">
+                <label htmlFor="username" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Username / Email *
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  placeholder="your@email.com"
+                  value={formData.username}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
+                  required
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Password *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="password"
+                    type="text"
+                    placeholder="Password"
+                    value={formData.password}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                    required
+                    className="block w-full border border-input bg-background px-4 py-2.5 text-foreground font-mono placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="px-3 py-2.5 border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                    title="Generate password"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="url" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Website URL
+                </label>
+                <input
+                  id="url"
+                  type="text"
+                  placeholder="https://example.com"
+                  value={formData.url}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, url: e.target.value }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="category" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Category
+                </label>
+                <input
+                  id="category"
+                  type="text"
+                  placeholder="e.g., Work, Personal, Finance"
+                  value={formData.category}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="totpSecret" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  TOTP Secret (for 2FA)
+                </label>
+                <input
+                  id="totpSecret"
+                  type="text"
+                  placeholder="Enter TOTP secret key"
+                  value={formData.totpSecret}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, totpSecret: e.target.value }))}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground font-mono placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add a TOTP secret to generate 2FA codes for this account
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="notes" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Notes
+                </label>
+                <textarea
+                  id="notes"
+                  placeholder="Additional notes..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
+                />
+              </div>
+
+              {/* Dialog Footer */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsDialogOpen(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : editingPassword ? (
+                    'Update'
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
