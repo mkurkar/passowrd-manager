@@ -214,6 +214,7 @@ export default function EnvVarsPage() {
 
   // Export state
   const [exportEnv, setExportEnv] = useState<string>('development');
+  const [exportProject, setExportProject] = useState<string>('all');
   const [exportedContent, setExportedContent] = useState('');
 
   // Import state
@@ -261,6 +262,15 @@ export default function EnvVarsPage() {
       return a.localeCompare(b);
     });
   }, [groupedEnvVars]);
+
+  // Get all unique projects for export dropdown
+  const allProjects = useMemo(() => {
+    const projects = new Set<string>();
+    envVars.forEach(v => {
+      if (v.project) projects.add(v.project);
+    });
+    return Array.from(projects).sort();
+  }, [envVars]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -374,18 +384,28 @@ export default function EnvVarsPage() {
   };
 
   const handleExport = () => {
-    const content = exportEnvFile(exportEnv);
+    const content = exportEnvFile(exportEnv, exportProject === 'all' ? undefined : exportProject);
     setExportedContent(content);
     setIsExportDialogOpen(true);
   };
 
+  const updateExportPreview = (env: string, project: string) => {
+    const content = exportEnvFile(env, project === 'all' ? undefined : project);
+    setExportedContent(content);
+  };
+
   const handleDownloadEnvFile = () => {
-    const content = exportEnvFile(exportEnv);
+    const content = exportEnvFile(exportEnv, exportProject === 'all' ? undefined : exportProject);
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `.env.${exportEnv}`;
+    // Create filename based on selections
+    let filename = `.env.${exportEnv}`;
+    if (exportProject !== 'all') {
+      filename = `.env.${exportProject}.${exportEnv}`;
+    }
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -809,7 +829,7 @@ export default function EnvVarsPage() {
                   Export Environment File
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Select an environment and export as a .env file
+                  Select environment and project to export as a .env file
                 </p>
               </div>
               <button
@@ -823,31 +843,55 @@ export default function EnvVarsPage() {
 
             {/* Dialog Body */}
             <div className="p-6 space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="exportEnv" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Environment
-                </label>
-                <select
-                  id="exportEnv"
-                  value={exportEnv}
-                  onChange={(e) => {
-                    setExportEnv(e.target.value);
-                    setExportedContent(exportEnvFile(e.target.value));
-                  }}
-                  className="block w-full border border-input bg-background px-4 py-2.5 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
-                >
-                  <option value="development">Development</option>
-                  <option value="staging">Staging</option>
-                  <option value="production">Production</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="exportEnv" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Environment
+                  </label>
+                  <select
+                    id="exportEnv"
+                    value={exportEnv}
+                    onChange={(e) => {
+                      setExportEnv(e.target.value);
+                      updateExportPreview(e.target.value, exportProject);
+                    }}
+                    className="block w-full border border-input bg-background px-4 py-2.5 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                  >
+                    <option value="development">Development</option>
+                    <option value="staging">Staging</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="exportProject" className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Project
+                  </label>
+                  <select
+                    id="exportProject"
+                    value={exportProject}
+                    onChange={(e) => {
+                      setExportProject(e.target.value);
+                      updateExportPreview(exportEnv, e.target.value);
+                    }}
+                    className="block w-full border border-input bg-background px-4 py-2.5 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                  >
+                    <option value="all">All Projects</option>
+                    {allProjects.map((project) => (
+                      <option key={project} value={project}>
+                        {project}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Preview
+                  Preview ({exportedContent.split('\n').filter(l => l).length} variables)
                 </label>
                 <pre className="p-4 bg-muted border-2 border-border text-sm font-mono overflow-auto max-h-64 text-foreground">
-                  {exportedContent || 'No variables for this environment'}
+                  {exportedContent || 'No variables for this selection'}
                 </pre>
               </div>
 
