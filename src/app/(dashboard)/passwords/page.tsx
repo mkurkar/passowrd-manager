@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { usePasswords } from '@/hooks/usePasswords';
+import { parsePasswordCSV, detectColumnMappings } from '@/hooks/usePasswords';
+import type { ParsedPassword, CSVColumnMapping, ImportResult } from '@/hooks/usePasswords';
 import { UnlockScreen } from '@/components/UnlockScreen';
 import { Sidebar } from '@/components/Sidebar';
 import { generatePassword } from '@/lib/encryption';
@@ -22,16 +24,21 @@ import {
   Smartphone,
   Check,
   X,
+  Upload,
+  FileText,
+  AlertCircle,
+  ChevronDown,
 } from 'lucide-react';
 import type { Password, PasswordForm } from '@/types';
 
 export default function PasswordsPage() {
   const { user, isLoading, isLocked } = useAuth();
-  const { passwords, isLoading: passwordsLoading, addPassword, updatePassword, deletePassword } = usePasswords();
+  const { passwords, isLoading: passwordsLoading, addPassword, updatePassword, deletePassword, importPasswords, getCategories } = usePasswords();
   const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingPassword, setEditingPassword] = useState<Password | null>(null);
   const [showPassword, setShowPassword] = useState<{ [key: string]: boolean }>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -50,6 +57,16 @@ export default function PasswordsPage() {
   });
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Import dialog state
+  const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview' | 'result'>('upload');
+  const [importFileContent, setImportFileContent] = useState('');
+  const [parsedPasswords, setParsedPasswords] = useState<ParsedPassword[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMappings, setColumnMappings] = useState<CSVColumnMapping[]>([]);
+  const [importOptions, setImportOptions] = useState({ skipExisting: true, defaultCategory: '' });
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Update TOTP codes every second
   useEffect(() => {
@@ -196,6 +213,21 @@ export default function PasswordsPage() {
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Password
+            </button>
+            <button
+              onClick={() => {
+                setImportStep('upload');
+                setImportFileContent('');
+                setParsedPasswords([]);
+                setCsvHeaders([]);
+                setColumnMappings([]);
+                setImportResult(null);
+                setIsImportDialogOpen(true);
+              }}
+              className="inline-flex items-center justify-center border border-input bg-background px-4 py-2.5 text-sm font-bold text-foreground shadow-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import
             </button>
           </div>
 
@@ -598,6 +630,370 @@ export default function PasswordsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Dialog */}
+      {isImportDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl bg-card border border-border shadow-elegant max-h-[90vh] overflow-hidden animate-fade-in flex flex-col">
+            {/* Dialog Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-foreground uppercase tracking-wide">
+                  Import Passwords
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {importStep === 'upload' && 'Upload a CSV file from your password manager'}
+                  {importStep === 'mapping' && 'Map CSV columns to password fields'}
+                  {importStep === 'preview' && 'Review passwords before importing'}
+                  {importStep === 'result' && 'Import complete'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportDialogOpen(false)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Dialog Body */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Step 1: Upload */}
+              {importStep === 'upload' && (
+                <div className="space-y-4">
+                  <div className="border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Drag and drop a CSV file, or click to browse
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const content = event.target?.result as string;
+                            setImportFileContent(content);
+                            const { passwords, headers, mappings } = parsePasswordCSV(content);
+                            setParsedPasswords(passwords);
+                            setCsvHeaders(headers);
+                            setColumnMappings(mappings);
+                            setImportStep('mapping');
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      className="hidden"
+                      id="csv-file-input"
+                    />
+                    <label
+                      htmlFor="csv-file-input"
+                      className="inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 cursor-pointer transition-all duration-200 uppercase tracking-wide"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Select CSV File
+                    </label>
+                  </div>
+                  
+                  <div className="p-4 bg-muted border border-border">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                      Supported Formats
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Most password managers export to CSV format including: Chrome, Firefox, Bitwarden, 1Password, LastPass, KeePass, and others.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Column Mapping */}
+              {importStep === 'mapping' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-primary/5 border-2 border-primary/20">
+                    <p className="text-sm text-foreground">
+                      <strong className="uppercase tracking-wide">Auto-detected columns:</strong> We&apos;ve tried to map your CSV columns. Adjust if needed.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {columnMappings.map((mapping, index) => (
+                      <div key={index} className="flex items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <code className="text-sm bg-muted px-2 py-1 border border-border text-foreground truncate block">
+                            {mapping.csvColumn}
+                          </code>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0 rotate-[-90deg]" />
+                        <div className="flex-1">
+                          <select
+                            value={mapping.mappedTo || ''}
+                            onChange={(e) => {
+                              const newMappings = [...columnMappings];
+                              newMappings[index] = {
+                                ...mapping,
+                                mappedTo: (e.target.value || null) as keyof PasswordForm | null,
+                              };
+                              setColumnMappings(newMappings);
+                            }}
+                            className="block w-full border border-input bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          >
+                            <option value="">-- Skip --</option>
+                            <option value="name">Name</option>
+                            <option value="username">Username</option>
+                            <option value="password">Password</option>
+                            <option value="url">URL</option>
+                            <option value="notes">Notes</option>
+                            <option value="category">Category</option>
+                            <option value="totpSecret">TOTP Secret</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Required fields check */}
+                  <div className="p-4 bg-muted border border-border">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                      Required Mappings
+                    </h4>
+                    <div className="flex gap-4 text-sm">
+                      <span className={columnMappings.some(m => m.mappedTo === 'name') ? 'text-primary' : 'text-destructive'}>
+                        {columnMappings.some(m => m.mappedTo === 'name') ? <Check className="inline h-4 w-4" /> : <X className="inline h-4 w-4" />} Name
+                      </span>
+                      <span className={columnMappings.some(m => m.mappedTo === 'username') ? 'text-primary' : 'text-destructive'}>
+                        {columnMappings.some(m => m.mappedTo === 'username') ? <Check className="inline h-4 w-4" /> : <X className="inline h-4 w-4" />} Username
+                      </span>
+                      <span className={columnMappings.some(m => m.mappedTo === 'password') ? 'text-primary' : 'text-destructive'}>
+                        {columnMappings.some(m => m.mappedTo === 'password') ? <Check className="inline h-4 w-4" /> : <X className="inline h-4 w-4" />} Password
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Preview */}
+              {importStep === 'preview' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground uppercase tracking-wide">
+                        {parsedPasswords.filter(p => p.name && p.username && p.password).length} passwords to import
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        {parsedPasswords.filter(p => !p.name || !p.username || !p.password).length} will be skipped (missing required fields)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Options */}
+                  <div className="p-4 bg-muted border border-border space-y-3">
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={importOptions.skipExisting}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, skipExisting: e.target.checked }))}
+                        className="w-4 h-4 border-2 border-input bg-background checked:bg-primary checked:border-primary focus:ring-primary"
+                      />
+                      <span className="text-sm text-foreground">Skip existing passwords (same name + username)</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Default Category (for entries without one)
+                      </label>
+                      <input
+                        type="text"
+                        value={importOptions.defaultCategory}
+                        onChange={(e) => setImportOptions(prev => ({ ...prev, defaultCategory: e.target.value }))}
+                        placeholder="e.g., Imported"
+                        className="block w-full border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Preview list */}
+                  <div className="border border-border max-h-60 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted sticky top-0">
+                        <tr>
+                          <th className="text-left p-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">Name</th>
+                          <th className="text-left p-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">Username</th>
+                          <th className="text-left p-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">URL</th>
+                          <th className="text-left p-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedPasswords.slice(0, 50).map((p, i) => {
+                          const isValid = p.name && p.username && p.password;
+                          return (
+                            <tr key={i} className={`border-t border-border ${!isValid ? 'opacity-50' : ''}`}>
+                              <td className="p-2 truncate max-w-[150px]">{p.name || '-'}</td>
+                              <td className="p-2 truncate max-w-[150px]">{p.username || '-'}</td>
+                              <td className="p-2 truncate max-w-[150px]">{p.url || '-'}</td>
+                              <td className="p-2">
+                                {isValid ? (
+                                  <span className="text-xs text-primary font-medium">Ready</span>
+                                ) : (
+                                  <span className="text-xs text-destructive font-medium">Skip</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {parsedPasswords.length > 50 && (
+                      <div className="p-2 text-center text-sm text-muted-foreground bg-muted">
+                        ... and {parsedPasswords.length - 50} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Result */}
+              {importStep === 'result' && importResult && (
+                <div className="space-y-4">
+                  <div className={`p-6 text-center ${importResult.imported > 0 ? 'bg-primary/5 border-2 border-primary' : 'bg-muted border-2 border-border'}`}>
+                    <div className="text-4xl font-bold text-primary mb-2">{importResult.imported}</div>
+                    <p className="text-sm text-muted-foreground uppercase tracking-wide">
+                      Passwords Imported
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted border border-border text-center">
+                      <div className="text-2xl font-bold text-foreground">{importResult.skipped}</div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Skipped</p>
+                    </div>
+                    <div className="p-4 bg-muted border border-border text-center">
+                      <div className="text-2xl font-bold text-foreground">{importResult.errors.length}</div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Errors</p>
+                    </div>
+                  </div>
+
+                  {importResult.errors.length > 0 && (
+                    <div className="p-4 bg-destructive/10 border-2 border-destructive">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-bold text-destructive uppercase tracking-wide mb-2">Errors</h4>
+                          <ul className="text-sm text-destructive space-y-1">
+                            {importResult.errors.slice(0, 5).map((err, i) => (
+                              <li key={i}>{err}</li>
+                            ))}
+                            {importResult.errors.length > 5 && (
+                              <li>... and {importResult.errors.length - 5} more</li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Dialog Footer */}
+            <div className="flex gap-3 p-6 border-t border-border flex-shrink-0">
+              {importStep === 'upload' && (
+                <button
+                  type="button"
+                  onClick={() => setIsImportDialogOpen(false)}
+                  className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                >
+                  Cancel
+                </button>
+              )}
+
+              {importStep === 'mapping' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setImportStep('upload')}
+                    className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Re-parse with updated mappings
+                      const { passwords } = parsePasswordCSV(importFileContent, columnMappings);
+                      setParsedPasswords(passwords);
+                      setImportStep('preview');
+                    }}
+                    disabled={!columnMappings.some(m => m.mappedTo === 'name') || !columnMappings.some(m => m.mappedTo === 'username') || !columnMappings.some(m => m.mappedTo === 'password')}
+                    className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+                  >
+                    Continue
+                  </button>
+                </>
+              )}
+
+              {importStep === 'preview' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setImportStep('mapping')}
+                    className="flex-1 px-4 py-2.5 text-sm font-bold text-foreground uppercase tracking-wide border border-input bg-background hover:bg-muted transition-all"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsImporting(true);
+                      try {
+                        const validPasswords = parsedPasswords.filter(p => p.name && p.username && p.password);
+                        const result = await importPasswords(validPasswords, importOptions);
+                        setImportResult(result);
+                        setImportStep('result');
+                      } catch (err) {
+                        console.error('Import failed:', err);
+                        setImportResult({
+                          imported: 0,
+                          skipped: 0,
+                          errors: [err instanceof Error ? err.message : 'Import failed'],
+                        });
+                        setImportStep('result');
+                      } finally {
+                        setIsImporting(false);
+                      }
+                    }}
+                    disabled={isImporting || parsedPasswords.filter(p => p.name && p.username && p.password).length === 0}
+                    className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 uppercase tracking-wide"
+                  >
+                    {isImporting ? (
+                      <>
+                        <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Importing...
+                      </>
+                    ) : (
+                      `Import ${parsedPasswords.filter(p => p.name && p.username && p.password).length} Passwords`
+                    )}
+                  </button>
+                </>
+              )}
+
+              {importStep === 'result' && (
+                <button
+                  type="button"
+                  onClick={() => setIsImportDialogOpen(false)}
+                  className="flex-1 inline-flex items-center justify-center bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-200 uppercase tracking-wide"
+                >
+                  Done
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

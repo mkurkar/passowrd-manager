@@ -23,7 +23,7 @@ export function UnlockScreen() {
         return;
       }
 
-      const success = unlock(masterPassword);
+      const success = await unlock(masterPassword);
       if (!success) {
         setError('Invalid master password');
       }

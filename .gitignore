@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PocketBase data (user data, should not be committed)
+pocketbase/pb_data/*.db
+pocketbase/pb_data/*.db-shm
+pocketbase/pb_data/*.db-wal
+
+# Mobile app
+mobile/node_modules/
+mobile/.expo/
